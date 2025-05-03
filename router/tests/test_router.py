@@ -5,7 +5,7 @@ import time
 from router import Router
 
 
-class TestRouterInitialization(unittest.TestCase):
+class TestRouterNeighbors(unittest.TestCase):
     def test_router_a(self):
         neighbors = {
             'B': ('10.0.0.2', 5000),
@@ -61,6 +61,45 @@ class TestRouterInitialization(unittest.TestCase):
         self.assertEqual(router._lsdb['E']['links'], expected_links)
 
 
+class TestRouterInitialization(unittest.TestCase):
+
+    def test_initial_lsa_generation(self):
+        neighbors = {'R2': ('127.0.0.1', 6001), 'R3': ('127.0.0.1', 6002)}
+        router = Router(router_id='R1', neighbors=neighbors)
+        self.assertIn('R1', router._lsdb)
+        self.assertEqual(router._lsdb['R1']['links'], {'R2': 1, 'R3': 1})
+        self.assertEqual(router._lsdb['R1']['sequence'], 1)
+
+    def test_lsdb_contains_only_self_after_init(self):
+        router = Router(router_id='R1', neighbors={'R2': ('127.0.0.1', 6001)})
+        self.assertListEqual(list(router._lsdb.keys()), ['R1'])
+
+    def test_seen_lsas_includes_initial_lsa(self):
+        router = Router(router_id='R1', neighbors={'R2': ('127.0.0.1', 6001)})
+        self.assertIn(('R1', 1), router._seen_lsas)
+
+    def test_sequence_number_increment_on_lsa_creation(self):
+        router = Router(router_id='R1', neighbors={'R2': ('127.0.0.1', 6001)})
+        seq_before = router._sequence_number
+        packet = router._create_lsa_packet()
+        self.assertEqual(packet['sequence'], seq_before + 1)
+        self.assertEqual(router._sequence_number, seq_before + 1)
+
+    def test_lsa_packet_structure(self):
+        router = Router(router_id='R1', neighbors={'R2': ('127.0.0.1', 6001)})
+        lsa = router._create_lsa_packet()
+        self.assertEqual(lsa['type'], 'lsa')
+        self.assertEqual(lsa['router_id'], 'R1')
+        self.assertIn('sequence', lsa)
+        self.assertIn('payload', lsa)
+        self.assertEqual(lsa['payload']['links'], {'R2': 1})
+
+    def test_router_with_no_neighbors(self):
+        router = Router(router_id='R1', neighbors={})
+        lsa = router._create_lsa_packet()
+        self.assertEqual(lsa['payload']['links'], {})
+
+
 class TestRouterCommunication(unittest.TestCase):
     def setUp(self):
         """Define os roteadores e os vizinhos simulados em localhost"""
@@ -68,13 +107,18 @@ class TestRouterCommunication(unittest.TestCase):
         self.r2_neighbors = {'R1': ('127.0.0.1', 6000)}
 
         # Inicia o patch globalmente para todas as instâncias de Router
-        patcher = patch.object(Router, '_process_received_lsa')
+        patcher = patch.object(Router, '_process_lsa')
         self.mock_process = patcher.start()
         self.addCleanup(patcher.stop)
 
-        # Define o comportamento substituto: apenas imprime
-        def imprimir_lsa(lsa):
-            print(f"[TESTE] Pacote recebido:", lsa)
+        # Função para validar o conteúdo do pacote
+        def imprimir_lsa(packet):
+            self.assertIn('type', packet)
+            self.assertIn('router_id', packet)
+            self.assertIn('sequence', packet)
+            self.assertIn('payload', packet)
+            self.assertIn('links', packet['payload'])
+            self.assertEqual(packet['type'], 'lsa')
 
         self.mock_process.side_effect = imprimir_lsa
 

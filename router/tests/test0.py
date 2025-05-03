@@ -124,43 +124,11 @@ class Router:
             
             time.sleep(0.01)  # Evita uso excessivo da CPU
 
-    def _receive_lsa_packets(self) -> None:
-        """
-        Thread para receber pacotes LSA dos vizinhos.
-        
-        Fica em loop ouvindo na porta UDP configurada e processa os pacotes recebidos.
-        Utiliza timeout para verificar periodicamente se deve continuar executando.
-        """
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.bind(('0.0.0.0', self._listen_port))
-            sock.settimeout(1.0)
-            
-            print(f"[Router {self._router_id}] Ouvindo LSAs na porta {self._listen_port}")
-            
-            while self._running:
-                try:
-                    data, addr = sock.recvfrom(1024)
-                    lsa = json.loads(data.decode())
-                    self._process_received_lsa(lsa)
-                except socket.timeout:
-                    continue
-                except Exception as e:
-                    print(f"[Router {self._router_id}] Erro ao processar LSA: {e}")
-
-    def _send_lsa_packets(self) -> None:
-        """Gera periodicamente pacotes de estado de enlace e adiciona à fila de envio."""
-        broadcast_interval = 5
-        while self._running:
-            with self._lock:
-                lsa_packet = {
-                    'type': 'lsa',
-                    'router_id': self._router_id,
-                    'sequence': time.time_ns(),
-                    'links': {n: 1 for n in self._neighbors}
-                }
-                for neighbor_id, (ip, port) in self._neighbors.items():
-                    self._outgoing_queue.append((lsa_packet, ip, port))
-            time.sleep(broadcast_interval)
+    def _generate_initial_lsa(self) -> None:
+        """Gera o LSA inicial do roteador"""
+        initial_lsa = self._create_lsa_packet()
+        self._update_lsdb(self._router_id, self._sequence_number, initial_lsa['payload']['links'])
+        self._seen_lsas.add((self._router_id, self._sequence_number))
     
     def _create_lsa_packet(self) -> Dict:
         """Cria um novo pacote LSA"""
@@ -173,12 +141,6 @@ class Router:
                 'links': {n: 1 for n in self._neighbors.keys()}
             }
         }
-
-    def _generate_initial_lsa(self) -> None:
-        """Gera o LSA inicial do roteador"""
-        initial_lsa = self._create_lsa_packet()
-        self._update_lsdb(self._router_id, self._sequence_number, initial_lsa['links'])
-        self._seen_lsas.add((self._router_id, self._sequence_number))
 
     def _generate_lsa_packets(self) -> None:
         """Thread para gerar LSAs periódicos"""
@@ -238,20 +200,6 @@ class Router:
             for neighbor_id, (ip, port) in self._neighbors.items():
                 if neighbor_id != except_neighbor:
                     self._outgoing_queue.append((lsa, ip, port))
-    
-    def _generate_lsa(self) -> Dict[str, Any]:
-        """
-        Gera um novo LSA com o estado atual dos enlaces.
-        
-        Returns:
-            Dicionário contendo o pacote LSA formatado
-        """
-        self._sequence_number += 1
-        return {
-            'router_id': self._router_id,
-            'sequence': self._sequence_number,
-            'links': {n: 1 for n in self._neighbors.keys()}
-        }
     
     def _process_data_packet(self, packet: Dict) -> None:
         """Processa pacotes de dados com roteamento"""
