@@ -79,7 +79,7 @@ class Router:
                 try:
                     data, addr = sock.recvfrom(1024)
                     packet = json.loads(data.decode())
-                    self._handle_packet(packet)
+                    self._handle_packet(packet, addr)
                 except socket.timeout:
                     continue
                 except Exception as e:
@@ -101,34 +101,35 @@ class Router:
             
             time.sleep(0.01)  # Evita uso excessivo da CPU
     
-    def _handle_packet(self, packet: Dict) -> None:
+    def _handle_packet(self, packet: Dict, addr: tuple) -> None:
         """Processa pacotes recebidos de acordo com o tipo"""
         packet_type = packet.get('type')
         
         if packet_type == 'lsa':
             self._process_lsa(packet)
         elif packet_type == 'data':
+            print(f"[Router {self._router_id}] Pacote de dados recebido de {addr}")
             self._process_data_packet(packet)
         else:
             print(f"[Router {self._router_id}] Tipo de pacote inválido: {packet_type}")
     
     def _process_data_packet(self, packet: Dict) -> None:
         """Processa pacotes de dados com roteamento"""
-        dst = packet.get('dst')
+        destination = packet.get('destination')
         
-        if dst == self._router_id:
+        if destination == self._router_id:
             print(f"[Router {self._router_id}] Pacote recebido: {packet.get('payload')}")
             return
         
         with self._lock:
-            route = self._routing_table.get(dst)
+            route = self._routing_table.get(destination)
             
         if route and route['next_hop'] in self._neighbors:
             ip, port = self._neighbors[route['next_hop']]
             self._outgoing_queue.append((packet, ip, port))
-            print(f"[Router {self._router_id}] Encaminhando pacote para {dst} via {route['next_hop']}")
+            print(f"[Router {self._router_id}] Encaminhando pacote para {destination} via {route['next_hop']}")
         else:
-            print(f"[Router {self._router_id}] Rota não encontrada para {dst}")
+            print(f"[Router {self._router_id}] Rota não encontrada para {destination}")
     
     # Mockar esse método
     def _generate_lsa_packets(self) -> None:
