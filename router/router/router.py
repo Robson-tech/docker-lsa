@@ -113,6 +113,18 @@ class Router:
                     print(f"[Router {self._router_id}] Falha no envio: {e}")
             
             time.sleep(0.01)  # Evita uso excessivo da CPU
+    
+    def _handle_packet(self, packet: Dict) -> None:
+        """Processa pacotes recebidos de acordo com o tipo"""
+        packet_type = packet.get('type')
+        
+        if packet_type == 'lsa':
+            self._process_lsa(packet)
+        elif packet_type == 'data':
+            print(f"[Router {self._router_id}] Pacote de dados recebido de {packet['source']}")
+            self._process_data_packet(packet)
+        else:
+            print(f"[Router {self._router_id}] Tipo de pacote inválido: {packet_type}")
 
     def _generate_initial_lsa(self) -> None:
         """Gera o LSA inicial do roteador"""
@@ -146,17 +158,6 @@ class Router:
                     self._outgoing_queue.append((lsa, ip, port))
             
             time.sleep(30)  # Intervalo OSPF padrão
-    
-    def _handle_packet(self, packet: Dict) -> None:
-        """Processa pacotes recebidos de acordo com o tipo"""
-        packet_type = packet.get('type')
-        
-        if packet_type == 'lsa':
-            self._process_lsa(packet)
-        elif packet_type == 'data':
-            self._process_data_packet(packet)
-        else:
-            print(f"[Router {self._router_id}] Tipo de pacote inválido: {packet_type}")
 
     def _process_lsa(self, lsa: Dict) -> None:
         """Processa um LSA recebido e faz flooding controlado"""
@@ -193,21 +194,21 @@ class Router:
     
     def _process_data_packet(self, packet: Dict) -> None:
         """Processa pacotes de dados com roteamento"""
-        dst = packet.get('dst')
+        destination = packet.get('destination')
         
-        if dst == self._router_id:
+        if destination == self._router_id:
             print(f"[Router {self._router_id}] Pacote recebido: {packet.get('payload')}")
             return
         
         with self._lock:
-            route = self._routing_table.get(dst)
+            route = self._routing_table.get(destination)
             
         if route and route['next_hop'] in self._neighbors:
             ip, port = self._neighbors[route['next_hop']]
             self._outgoing_queue.append((packet, ip, port))
-            print(f"[Router {self._router_id}] Encaminhando pacote para {dst} via {route['next_hop']}")
+            print(f"[Router {self._router_id}] Encaminhando pacote para {destination} via {route['next_hop']}")
         else:
-            print(f"[Router {self._router_id}] Rota não encontrada para {dst}")
+            print(f"[Router {self._router_id}] Rota não encontrada para {destination}")
     
     def _update_lsdb(self, router_id: str, sequence: int, links: Dict[str, int]) -> None:
         """
@@ -295,10 +296,8 @@ class Router:
             
             if path and path[0] in self._neighbors:
                 next_hop = path[0]
-                interface = self._get_interface_for_neighbor(next_hop)
                 routing_table[destination] = {
                     'next_hop': next_hop,
-                    'interface': interface,
                     'cost': distances[destination]
                 }
         
@@ -307,12 +306,6 @@ class Router:
             print(f"[Router {self._router_id}] Tabela de roteamento atualizada:")
             for dest, route in routing_table.items():
                 print(f"  {dest} -> {route['next_hop']} (Interface: {route['interface']}, Custo: {route['cost']})")
-    
-    def _get_interface_for_neighbor(self, neighbor_id):
-        """Retorna a interface de rede para alcançar um vizinho"""
-        # Esta é uma implementação simplificada
-        # Em uma implementação real, você mapearia vizinhos para interfaces específicas
-        return f"eth_{neighbor_id}"
 
 
 if __name__ == '__main__':
