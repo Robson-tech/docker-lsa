@@ -102,12 +102,12 @@ class Router:
         """
         with self._lock:
             header = f"┌{'─' * 12}┬{'─' * 22}┬{'─' * 50}┐\n"
-            title = f"│ {'Roteador':<10} │ {'Sequência':<20} │ {'Enlaces (vizinho: custo)':<48}│\n"
+            title = f"│ {'Roteador':<10} │ {'Sequência':<20} │ {'Enlaces (vizinho: custo)':<49}│\n"
             divider = f"├{'─' * 12}┼{'─' * 22}┼{'─' * 50}┤\n"
             rows = ""
             for router_id, data in self._lsdb.items():
                 links_str = ', '.join(f"{n}:{c}" for n, c in data['links'].items())
-                rows += f"│ {router_id:<10} │ {data['sequence']:<20} │ {links_str:<48}│\n"
+                rows += f"│ {router_id:<10} │ {data['sequence']:<20} │ {links_str:<49}│\n"
             footer = f"└{'─' * 12}┴{'─' * 22}┴{'─' * 50}┘"
 
             table = f"\n[Router {self._router_id}] Link State Database (LSDB):\n"
@@ -117,34 +117,28 @@ class Router:
     
     def print_routing_table(self) -> None:
         """
-        Imprime a tabela de roteamento com bordas usando caracteres de linha.
+        Gera e imprime a tabela de roteamento com bordas usando caracteres de linha.
         A saída é montada em uma única string para evitar que múltiplas threads quebrem a formatação.
         """
-        output = []
-        header = f"[Router {self._router_id}] Tabela de Roteamento:"
-        output.append(header)
-
-        # Tamanhos das colunas
-        col1, col2, col3 = 10, 5, 15
-        total_width = col1 + col2 + col3 + 10  # 10 = 4 pipes + 6 espaços extra
-
-        # Linhas de borda
-        top_border = "+" + "-" * (col1 + 2) + "+" + "-" * (col2 + 2) + "+" + "-" * (col3 + 2) + "+"
-        header_line = f"| {'Destino':<{col1}} | {'Custo':<{col2}} | {'Próximo Salto':<{col3}} |"
-
-        output.append(top_border)
-        output.append(header_line)
-        output.append(top_border)
-
         with self._lock:
+            col1, col2, col3 = 12, 8, 20  # larguras das colunas
+            header = f"\n[Router {self._router_id}] Tabela de Roteamento:\n"
+
+            top_border = f"┌{'─' * col1}┬{'─' * col2}┬{'─' * col3}┐\n"
+            header_line = f"│ {'Destino':<{col1 - 2}} │ {'Custo':<{col2 - 2}} │ {'Próximo Salto':<{col3 - 1}}│\n"
+            mid_border = f"├{'─' * col1}┼{'─' * col2}┼{'─' * col3}┤\n"
+            rows = ""
+
             for dest, info in self._routing_table.items():
                 cost = info.get('cost', '?')
                 next_hop = info.get('next_hop', '?')
-                row = f"| {dest:<{col1}} | {cost:<{col2}} | {next_hop:<{col3}} |"
-                output.append(row)
+                rows += f"│ {dest:<{col1 - 2}} │ {cost:<{col2 - 2}} │ {next_hop:<{col3 - 1}}│\n"
 
-        output.append(top_border)
-        print("\n".join(output))
+            bottom_border = f"└{'─' * col1}┴{'─' * col2}┴{'─' * col3}┘"
+
+            table = header + top_border + header_line + mid_border + rows + bottom_border
+
+        print(table)
     
     def _receive_packets(self) -> None:
         """Thread para receber todos os pacotes"""
