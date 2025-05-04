@@ -98,15 +98,22 @@ class Router:
     
     def print_lsdb(self) -> None:
         """
-        Imprime a Link State Database (LSDB) em formato tabular.
+        Gera e imprime a Link State Database (LSDB) em formato tabular com contorno.
         """
-        print(f"\n[Router {self._router_id}] Link State Database (LSDB):")
-        print(f"{'Roteador':<10} | {'Sequência':<20} | {'Enlaces (vizinho: custo)':<30}")
-        print("-" * 70)
         with self._lock:
+            header = f"┌{'─' * 12}┬{'─' * 22}┬{'─' * 50}┐\n"
+            title = f"│ {'Roteador':<10} │ {'Sequência':<20} │ {'Enlaces (vizinho: custo)':<48}│\n"
+            divider = f"├{'─' * 12}┼{'─' * 22}┼{'─' * 50}┤\n"
+            rows = ""
             for router_id, data in self._lsdb.items():
                 links_str = ', '.join(f"{n}:{c}" for n, c in data['links'].items())
-                print(f"{router_id:<10} | {data['sequence']:<20} | {links_str:<30}")
+                rows += f"│ {router_id:<10} │ {data['sequence']:<20} │ {links_str:<48}│\n"
+            footer = f"└{'─' * 12}┴{'─' * 22}┴{'─' * 50}┘"
+
+            table = f"\n[Router {self._router_id}] Link State Database (LSDB):\n"
+            table += header + title + divider + rows + footer
+
+        print(table)
     
     def print_routing_table(self) -> None:
         """
@@ -208,7 +215,6 @@ class Router:
         self._sequence_number += 1
         return {
             'type': 'lsa',
-            'router_id': self._router_id,
             'sequence': self._sequence_number,
             'source': self._router_id,
             'payload': {
@@ -233,7 +239,7 @@ class Router:
 
     def _process_lsa(self, lsa: Dict) -> None:
         """Processa um LSA recebido e faz flooding controlado"""
-        sender_id = lsa['router_id']
+        sender_id = lsa['source']
         sequence = lsa['sequence']
         links = lsa['payload']['links']
         
@@ -249,8 +255,9 @@ class Router:
             # Atualiza a LSDB
             self._seen_lsas.add((sender_id, sequence))
             self._update_lsdb(sender_id, sequence, links)
-            print(f"[Router {self._router_id}] LSDB atualizada com LSA de {sender_id}")
-            
+        
+        self.print_lsdb()
+
         # Agenda flooding para outros vizinhos
         self._schedule_flooding(lsa, except_neighbor=sender_id)
         
