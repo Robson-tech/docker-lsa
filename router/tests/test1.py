@@ -131,7 +131,6 @@ class Router:
         else:
             print(f"[Router {self._router_id}] Rota não encontrada para {destination}")
     
-    # Mockar esse método
     def _generate_lsa_packets(self) -> None:
         """Thread para gerar LSAs periódicos"""
         while self._running:
@@ -147,7 +146,6 @@ class Router:
             
             time.sleep(30)  # Intervalo OSPF padrão
     
-    # Mockar esse método
     def _process_lsa(self, lsa: Dict) -> None:
         """Processa um LSA recebido e faz flooding controlado"""
         sender_id = lsa['router_id']

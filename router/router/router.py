@@ -19,9 +19,29 @@ class Router:
         self._sequence_number = 0
         self._seen_lsas: Set[Tuple[str, int]] = set()
         self._outgoing_queue: List[Tuple[Dict, str, int]] = []  # (packet, ip, port)
+
+        # Inicializa estruturas de roteamento
+        self._initialize_routing_structures()
+
+    def _initialize_routing_structures(self) -> None:
+        """
+        Inicializa a LSDB e tabela de roteamento com informações básicas.
         
-        # Inicializa a LSDB com o próprio roteador
-        self._generate_initial_lsa()
+        1. Cria LSA inicial do próprio roteador
+        2. Inicializa tabela de roteamento com vizinhos diretos
+        """
+        with self._lock:
+            # Inicializa a LSDB com o próprio roteador
+            self._generate_initial_lsa()
+            
+            # Inicializa tabela de roteamento com vizinhos diretos
+            for neighbor in self._neighbors.keys():
+                self._routing_table[neighbor] = {
+                    'next_hop': neighbor,
+                    'cost': 1  # Custo padrão para vizinhos diretos
+                }
+            
+            print(f"[Router {self._router_id}] Tabela de roteamento inicializada com vizinhos diretos")
     
     def start(self) -> None:
         """Inicia as threads de processamento"""
@@ -69,16 +89,34 @@ class Router:
     
     def print_routing_table(self) -> None:
         """
-        Imprime a tabela de roteamento (routing table) em formato tabular.
+        Imprime a tabela de roteamento com bordas usando caracteres de linha.
+        A saída é montada em uma única string para evitar que múltiplas threads quebrem a formatação.
         """
-        print(f"\n[Router {self._router_id}] Tabela de Roteamento:")
-        print(f"{'Destino':<10} | {'Custo':<5} | {'Próximo Salto':<15}")
-        print("-" * 40)
+        output = []
+        header = f"[Router {self._router_id}] Tabela de Roteamento:"
+        output.append(header)
+
+        # Tamanhos das colunas
+        col1, col2, col3 = 10, 5, 15
+        total_width = col1 + col2 + col3 + 10  # 10 = 4 pipes + 6 espaços extra
+
+        # Linhas de borda
+        top_border = "+" + "-" * (col1 + 2) + "+" + "-" * (col2 + 2) + "+" + "-" * (col3 + 2) + "+"
+        header_line = f"| {'Destino':<{col1}} | {'Custo':<{col2}} | {'Próximo Salto':<{col3}} |"
+
+        output.append(top_border)
+        output.append(header_line)
+        output.append(top_border)
+
         with self._lock:
             for dest, info in self._routing_table.items():
                 cost = info.get('cost', '?')
                 next_hop = info.get('next_hop', '?')
-                print(f"{dest:<10} | {cost:<5} | {next_hop:<15}")
+                row = f"| {dest:<{col1}} | {cost:<{col2}} | {next_hop:<{col3}} |"
+                output.append(row)
+
+        output.append(top_border)
+        print("\n".join(output))
     
     def _receive_packets(self) -> None:
         """Thread para receber todos os pacotes"""
@@ -139,6 +177,7 @@ class Router:
             'type': 'lsa',
             'router_id': self._router_id,
             'sequence': self._sequence_number,
+            'source': self._router_id,
             'payload': {
                 'links': {n: 1 for n in self._neighbors.keys()}
             }
@@ -179,11 +218,11 @@ class Router:
             self._update_lsdb(sender_id, sequence, links)
             print(f"[Router {self._router_id}] LSDB atualizada com LSA de {sender_id}")
             
-            # Agenda flooding para outros vizinhos
-            self._schedule_flooding(lsa, except_neighbor=sender_id)
-            
-            # Recalcula rotas
-            self._run_dijkstra()
+        # Agenda flooding para outros vizinhos
+        self._schedule_flooding(lsa, except_neighbor=sender_id)
+        
+        # Recalcula rotas
+        self._run_dijkstra()
 
     def _schedule_flooding(self, lsa: Dict, except_neighbor: Optional[str] = None) -> None:
         """Adiciona pacotes LSA na fila de saída para flooding"""
@@ -234,7 +273,7 @@ class Router:
         """
         if not self._lsdb:
             return
-            
+        
         visited = set()
         distances = defaultdict(lambda: float('inf'))
         previous_nodes = {}
@@ -302,10 +341,9 @@ class Router:
                 }
         
         with self._lock:
-            self._routing_table = routing_table
-            print(f"[Router {self._router_id}] Tabela de roteamento atualizada:")
-            for dest, route in routing_table.items():
-                print(f"  {dest} -> {route['next_hop']} (Interface: {route['interface']}, Custo: {route['cost']})")
+            self._routing_table.update(routing_table)
+        
+        self.print_routing_table()
 
 
 if __name__ == '__main__':
