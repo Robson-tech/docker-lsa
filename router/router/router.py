@@ -43,6 +43,27 @@ class Router:
             
             print(f"[Router {self._router_id}] Tabela de roteamento inicializada com vizinhos diretos")
     
+    def _generate_initial_lsa(self) -> None:
+        """Gera o LSA inicial do roteador"""
+        initial_lsa = self._create_lsa_packet()
+        self._update_lsdb(self._router_id, self._sequence_number, initial_lsa['payload']['links'])
+        self._seen_lsas.add((self._router_id, self._sequence_number))
+    
+    def _update_lsdb(self, router_id: str, sequence: int, links: Dict[str, int]) -> None:
+        """
+        Atualiza o Link State Database com novas informações.
+        
+        Args:
+            router_id: ID do roteador que originou a informação
+            sequence: Número de sequência do LSA
+            links: Dicionário de enlaces {vizinho: custo}
+        """
+        self._lsdb[router_id] = {
+            'sequence': sequence,
+            'links': links,
+            'timestamp': time.time()
+        }
+    
     def start(self) -> None:
         """Inicia as threads de processamento"""
         self._running = True
@@ -163,12 +184,24 @@ class Router:
             self._process_data_packet(packet)
         else:
             print(f"[Router {self._router_id}] Tipo de pacote inválido: {packet_type}")
-
-    def _generate_initial_lsa(self) -> None:
-        """Gera o LSA inicial do roteador"""
-        initial_lsa = self._create_lsa_packet()
-        self._update_lsdb(self._router_id, self._sequence_number, initial_lsa['payload']['links'])
-        self._seen_lsas.add((self._router_id, self._sequence_number))
+    
+    def _process_data_packet(self, packet: Dict) -> None:
+        """Processa pacotes de dados com roteamento"""
+        destination = packet.get('destination')
+        
+        if destination == self._router_id:
+            print(f"[Router {self._router_id}] Pacote recebido: {packet.get('payload')}")
+            return
+        
+        with self._lock:
+            route = self._routing_table.get(destination)
+            
+        if route and route['next_hop'] in self._neighbors:
+            ip, port = self._neighbors[route['next_hop']]
+            self._outgoing_queue.append((packet, ip, port))
+            print(f"[Router {self._router_id}] Encaminhando pacote para {destination} via {route['next_hop']}")
+        else:
+            print(f"[Router {self._router_id}] Rota não encontrada para {destination}")
     
     def _create_lsa_packet(self) -> Dict:
         """Cria um novo pacote LSA"""
@@ -230,39 +263,6 @@ class Router:
             for neighbor_id, (ip, port) in self._neighbors.items():
                 if neighbor_id != except_neighbor:
                     self._outgoing_queue.append((lsa, ip, port))
-    
-    def _process_data_packet(self, packet: Dict) -> None:
-        """Processa pacotes de dados com roteamento"""
-        destination = packet.get('destination')
-        
-        if destination == self._router_id:
-            print(f"[Router {self._router_id}] Pacote recebido: {packet.get('payload')}")
-            return
-        
-        with self._lock:
-            route = self._routing_table.get(destination)
-            
-        if route and route['next_hop'] in self._neighbors:
-            ip, port = self._neighbors[route['next_hop']]
-            self._outgoing_queue.append((packet, ip, port))
-            print(f"[Router {self._router_id}] Encaminhando pacote para {destination} via {route['next_hop']}")
-        else:
-            print(f"[Router {self._router_id}] Rota não encontrada para {destination}")
-    
-    def _update_lsdb(self, router_id: str, sequence: int, links: Dict[str, int]) -> None:
-        """
-        Atualiza o Link State Database com novas informações.
-        
-        Args:
-            router_id: ID do roteador que originou a informação
-            sequence: Número de sequência do LSA
-            links: Dicionário de enlaces {vizinho: custo}
-        """
-        self._lsdb[router_id] = {
-            'sequence': sequence,
-            'links': links,
-            'timestamp': time.time()
-        }
 
     def _run_dijkstra(self) -> None:
         """

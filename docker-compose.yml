@@ -1,153 +1,199 @@
 version: '3.8'
 
 services:
-  # Roteador 1
-  router1:
-    image: router
-    build: ./routers
-    container_name: router1
-    environment:
-      - ROUTER_ID=router1
-      - LISTEN_PORT=5000
-    cap_add:
-      - NET_ADMIN
-    sysctls:
-      - net.ipv4.ip_forward=1
+  router_a:
+    image: python:3.9
+    container_name: router_a
     networks:
-      subnet1:
-        ipv4_address: 10.0.1.1
-      subnet2:
-        ipv4_address: 10.0.2.1
-      backbone:
-        ipv4_address: 10.1.0.1
+      net_ab:
+        ipv4_address: 10.0.12.2
+      net_ac:
+        ipv4_address: 10.0.13.2
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
 
-  # Roteador 2
-  router2:
-    image: router
-    build: ./routers
-    container_name: router2
-    environment:
-      - ROUTER_ID=router2
-      - LISTEN_PORT=5000
-    cap_add:
-      - NET_ADMIN
-    sysctls:
-      - net.ipv4.ip_forward=1
+  router_b:
+    image: python:3.9
+    container_name: router_b
     networks:
-      subnet3:
-        ipv4_address: 10.0.3.1
-      subnet4:
-        ipv4_address: 10.0.4.1
-      backbone:
-        ipv4_address: 10.1.0.2
+      net_ab:
+        ipv4_address: 10.0.12.3
+      net_bd:
+        ipv4_address: 10.0.24.2
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
 
-  # Roteador 3
-  router3:
-    image: router
-    build: ./routers
-    container_name: router3
-    environment:
-      - ROUTER_ID=router3
-      - LISTEN_PORT=5000
-    cap_add:
-      - NET_ADMIN
-    sysctls:
-      - net.ipv4.ip_forward=1
+  router_c:
+    image: python:3.9
+    container_name: router_c
     networks:
-      subnet5:
-        ipv4_address: 10.0.5.1
-      subnet6:
-        ipv4_address: 10.0.6.1
-      backbone:
-        ipv4_address: 10.1.0.3
+      net_ac:
+        ipv4_address: 10.0.13.3
+      net_ce:
+        ipv4_address: 10.0.35.2
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
 
-  # Hosts do Roteador 1
-  host1a:
-    image: redes2-host
-    build: ./hosts
-    container_name: host1a
+  router_d:
+    image: python:3.9
+    container_name: router_d
     networks:
-      subnet1:
-        ipv4_address: 10.0.1.10
+      net_bd:
+        ipv4_address: 10.0.24.3
+      net_de:
+        ipv4_address: 10.0.45.2
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
 
-  host1b:
-    image: redes2-host
-    build: ./hosts
-    container_name: host1b
+  router_e:
+    image: python:3.9
+    container_name: router_e
     networks:
-      subnet2:
-        ipv4_address: 10.0.2.10
+      net_ce:
+        ipv4_address: 10.0.35.3
+      net_de:
+        ipv4_address: 10.0.45.3
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
 
-  # Hosts do Roteador 2
-  host2a:
-    image: redes2-host
-    build: ./hosts
-    container_name: host2a
+  host_a1:
+    image: python:3.9
+    container_name: host_a1
     networks:
-      subnet3:
-        ipv4_address: 10.0.3.10
+      net_a:
+        ipv4_address: 10.0.1.2
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
 
-  host2b:
-    image: redes2-host
-    build: ./hosts
-    container_name: host2b
+  host_a2:
+    image: python:3.9
+    container_name: host_a2
     networks:
-      subnet4:
-        ipv4_address: 10.0.4.10
+      net_a:
+        ipv4_address: 10.0.1.3
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
 
-  # Hosts do Roteador 3
-  host3a:
-    image: redes2-host
-    build: ./hosts
-    container_name: host3a
+  host_b1:
+    image: python:3.9
+    container_name: host_b1
     networks:
-      subnet5:
-        ipv4_address: 10.0.5.10
+      net_b:
+        ipv4_address: 10.0.2.2
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
 
-  host3b:
-    image: redes2-host
-    build: ./hosts
-    container_name: host3b
+  host_b2:
+    image: python:3.9
+    container_name: host_b2
     networks:
-      subnet6:
-        ipv4_address: 10.0.6.10
+      net_b:
+        ipv4_address: 10.0.2.3
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
+
+  host_c1:
+    image: python:3.9
+    container_name: host_c1
+    networks:
+      net_c:
+        ipv4_address: 10.0.3.2
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
+
+  host_c2:
+    image: python:3.9
+    container_name: host_c2
+    networks:
+      net_c:
+        ipv4_address: 10.0.3.3
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
+
+  host_d1:
+    image: python:3.9
+    container_name: host_d1
+    networks:
+      net_d:
+        ipv4_address: 10.0.4.2
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
+
+  host_d2:
+    image: python:3.9
+    container_name: host_d2
+    networks:
+      net_d:
+        ipv4_address: 10.0.4.3
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
+
+  host_e1:
+    image: python:3.9
+    container_name: host_e1
+    networks:
+      net_e:
+        ipv4_address: 10.0.5.2
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
+
+  host_e2:
+    image: python:3.9
+    container_name: host_e2
+    networks:
+      net_e:
+        ipv4_address: 10.0.5.3
+    cap_add: ["NET_ADMIN"]
+    command: tail -f /dev/null
 
 networks:
-  # Redes locais de cada roteador
-  subnet1:
+  net_a:
     driver: bridge
     ipam:
       config:
         - subnet: 10.0.1.0/24
-  subnet2:
+  net_b:
     driver: bridge
     ipam:
       config:
         - subnet: 10.0.2.0/24
-  subnet3:
+  net_c:
     driver: bridge
     ipam:
       config:
         - subnet: 10.0.3.0/24
-  subnet4:
+  net_d:
     driver: bridge
     ipam:
       config:
         - subnet: 10.0.4.0/24
-  subnet5:
+  net_e:
     driver: bridge
     ipam:
       config:
         - subnet: 10.0.5.0/24
-  subnet6:
+  net_ab:
     driver: bridge
     ipam:
       config:
-        - subnet: 10.0.6.0/24
-  
-  # Rede backbone para interconexão dos roteadores
-  backbone:
+        - subnet: 10.0.12.0/24
+  net_ac:
     driver: bridge
     ipam:
       config:
-        - subnet: 10.1.0.0/24
+        - subnet: 10.0.13.0/24
+  net_bd:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.24.0/24
+  net_ce:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.35.0/24
+  net_de:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.45.0/24
