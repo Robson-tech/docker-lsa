@@ -45,7 +45,7 @@ class Host:
             try:
                 data, _ = sock.recvfrom(1024)
                 message = json.loads(data.decode())
-                print(f"[Host {self._host_id}] Recebeu mensagem: {message}")
+                print(f"[Host {self._host_id}] Recebeu mensagem de {message['source']}: {message['payload']}")
 
                 if message['type'] == 'data' and message['destination'] == self._host_id:
                     # Prepara resposta, mas apenas enfileira
@@ -97,3 +97,7 @@ class Host:
                 print(f"[Host {self._host_id}] Enviou para {packet['destination']}: {packet['payload']}")
         except Exception as e:
             print(f"[Host {self._host_id}] Erro ao enviar pacote: {e}")
+
+
+if __name__ == '__main__':
+    pass
