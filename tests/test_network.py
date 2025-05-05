@@ -162,15 +162,15 @@ class TestSmallNetwork(unittest.TestCase):
         for device in [self.router1, self.router2, self.host1, self.host2, self.host3, self.host4]:
             device.start()
 
-    def tearDown(self):
-        self.router1.stop()
-        self.router2.stop()
+    # def tearDown(self):
+    #     self.router2.stop()
+    #     self.router1.stop()
 
-        for host in [self.host1, self.host2, self.host3, self.host4]:
-            host.stop()
+    #     for host in [self.host1, self.host2, self.host3, self.host4]:
+    #         host.stop()
 
     def test_roteadores_conectados(self):
-        time.sleep(1)
+        time.sleep(20)
         table1 = self.router1._routing_table
         table2 = self.router2._routing_table
 

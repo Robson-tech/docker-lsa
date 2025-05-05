@@ -16,6 +16,7 @@ class Host:
 
         self._running = False
         self._receiver_thread = None
+        self._sequence_number = 0
         self._sender_thread = None
         self._outgoing_queue: List[Dict[str, Any]] = []
 
@@ -45,23 +46,25 @@ class Host:
             try:
                 data, _ = sock.recvfrom(1024)
                 message = json.loads(data.decode())
-                print(f"[Host {self._host_id}] Recebeu mensagem de {message['source']}: {message['payload']}")
+                typeMessage = message['type']
+                sourceMessage = message['source']
+                destinationMessage = message['destination']
+                contentMessage = message['payload']
 
-                if message['type'] == 'data' and message['destination'] == self._host_id:
+                print(f"[Host {self._host_id}] Recebeu mensagem de {sourceMessage}: {contentMessage}")
+
+                if typeMessage == 'data' and destinationMessage == self._host_id:
                     # Prepara resposta, mas apenas enfileira
-                    response = {
-                        'type': 'data',
-                        'source': self._host_id,
-                        'destination': message['source'],
-                        'payload': 'Legal.'
-                    }
+                    response = self._create_data_packet(destinationMessage, 'Legal.')
                     with self._lock:
                         self._outgoing_queue.append(response)
 
             except socket.timeout:
                 continue
+            except KeyError as e:
+                print(f'[Host {self._host_id}] Erro de formato do pacote. Campo não reconhecido: {e}')
             except Exception as e:
-                print(f"[Host {self._host_id}] Erro ao receber mensagem: {e}")
+                print(f'[Host {self._host_id}] Erro ao receber mensagem: {e}')
 
         sock.close()
 
@@ -71,13 +74,8 @@ class Host:
 
             # Mensagem espontânea
             if self._known_hosts:
-                destination = random.choice(self._known_hosts)
-                packet = {
-                    'type': 'data',
-                    'source': self._host_id,
-                    'destination': destination,
-                    'payload': 'Legal?'
-                }
+                destinationRandom = random.choice(self._known_hosts)
+                packet = self._create_data_packet(destinationRandom, 'Legal?')
                 with self._lock:
                     self._outgoing_queue.append(packet)
 
@@ -97,6 +95,20 @@ class Host:
                 print(f"[Host {self._host_id}] Enviou para {packet['destination']}: {packet['payload']}")
         except Exception as e:
             print(f"[Host {self._host_id}] Erro ao enviar pacote: {e}")
+
+    def _create_data_packet(self, destination: str, content: str) -> Dict:
+        """Cria um novo pacote LSA"""
+        self._sequence_number += 1
+        return {
+            'type': 'data',
+            'sequence': self._sequence_number,
+            'source': self._host_id,
+            'destination': destination,
+            'ttl': 10,
+            'payload': {
+                'content': content
+            }
+        }
 
 
 if __name__ == '__main__':
