@@ -27,7 +27,7 @@ Este simulador foi projetado para ser leve, modular e extensível, e pode futura
 
 A topologia abaixo representa os roteadores (R1–R5) conectados por enlaces com custos diferentes, e dois hosts (H1 e H2) conectados aos roteadores R1 e R5, respectivamente.
 
-![Topologia da Rede](docs/topologia.png)
+![Topologia da Rede](docs/topologia.jpg)
 
 > *Legenda:*
 > - Os nós **R1 a R5** são roteadores com enlaces bidirecionais e custos definidos.
