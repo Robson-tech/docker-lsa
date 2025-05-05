@@ -244,5 +244,8 @@ class TestLSAExchangeIntegration(unittest.TestCase):
                 self.assertIn('R3', lsdb, f"{router._router_id} não recebeu LSA de R3")
 
 
+
+
+
 if __name__ == '__main__':
     unittest.main()

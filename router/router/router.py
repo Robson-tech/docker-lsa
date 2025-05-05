@@ -15,7 +15,7 @@ class Router:
         self._lsdb: Dict[str, Dict[str, Any]] = {}  # Link State Database
         self._running = False
         self._lock = threading.Lock()
-        self._routing_table: Dict[str, Dict[str, Any]] = {}
+        self._routing_table: Dict[str, Dict[str, int]] = {}
         self._sequence_number = 0
         self._seen_lsas: Set[Tuple[str, int]] = set()
         self._outgoing_queue: List[Tuple[Dict, str, int]] = []  # (packet, ip, port)
@@ -26,13 +26,20 @@ class Router:
     def _initialize_routing_structures(self) -> None:
         """
         Inicializa a LSDB e tabela de roteamento com informações básicas.
-        
-        1. Cria LSA inicial do próprio roteador
-        2. Inicializa tabela de roteamento com vizinhos diretos
+        O primeiro vizinho na lista será configurado como gateway padrão.
         """
         with self._lock:
             # Inicializa a LSDB com o próprio roteador
             self._generate_initial_lsa()
+
+            # Configura o primeiro vizinho como gateway padrão
+            if self._neighbors:
+                first_neighbor = next(iter(self._neighbors.keys()))
+                self._routing_table['0.0.0.0'] = {
+                    'next_hop': first_neighbor,
+                    'cost': 1
+                }
+                print(f"[Router {self._router_id}] Gateway padrão configurado para {first_neighbor}")
             
             # Inicializa tabela de roteamento com vizinhos diretos
             for neighbor in self._neighbors.keys():
@@ -41,7 +48,7 @@ class Router:
                     'cost': 1  # Custo padrão para vizinhos diretos
                 }
             
-            print(f"[Router {self._router_id}] Tabela de roteamento inicializada com vizinhos diretos")
+        print(f"[Router {self._router_id}] Tabela de roteamento inicializada com vizinhos diretos\n{self.get_routing_table_formatted()}")
     
     def _generate_initial_lsa(self) -> None:
         """Gera o LSA inicial do roteador"""
@@ -96,7 +103,7 @@ class Router:
         self.lsa_generator_thread.join()
         print(f"[Router {self._router_id}] Threads paradas")
     
-    def print_lsdb(self) -> None:
+    def get_lsdb_table_formatted(self) -> str:
         """
         Gera e imprime a Link State Database (LSDB) em formato tabular com contorno.
         """
@@ -110,19 +117,17 @@ class Router:
                 rows += f"│ {router_id:<10} │ {data['sequence']:<20} │ {links_str:<49}│\n"
             footer = f"└{'─' * 12}┴{'─' * 22}┴{'─' * 50}┘"
 
-            table = f"\n[Router {self._router_id}] Link State Database (LSDB):\n"
-            table += header + title + divider + rows + footer
+            table = header + title + divider + rows + footer
 
-        print(table)
+        return table
     
-    def print_routing_table(self) -> None:
+    def get_routing_table_formatted(self) -> str:
         """
         Gera e imprime a tabela de roteamento com bordas usando caracteres de linha.
         A saída é montada em uma única string para evitar que múltiplas threads quebrem a formatação.
         """
         with self._lock:
             col1, col2, col3 = 12, 8, 20  # larguras das colunas
-            header = f"\n[Router {self._router_id}] Tabela de Roteamento:\n"
 
             top_border = f"┌{'─' * col1}┬{'─' * col2}┬{'─' * col3}┐\n"
             header_line = f"│ {'Destino':<{col1 - 2}} │ {'Custo':<{col2 - 2}} │ {'Próximo Salto':<{col3 - 1}}│\n"
@@ -136,9 +141,9 @@ class Router:
 
             bottom_border = f"└{'─' * col1}┴{'─' * col2}┴{'─' * col3}┘"
 
-            table = header + top_border + header_line + mid_border + rows + bottom_border
+            table = top_border + header_line + mid_border + rows + bottom_border
 
-        print(table)
+        return table
     
     def _receive_packets(self) -> None:
         """Thread para receber todos os pacotes"""
@@ -188,6 +193,14 @@ class Router:
     
     def _process_data_packet(self, packet: Dict) -> None:
         """Processa pacotes de dados com roteamento"""
+
+        # Verifica e decrementa TTL
+        if 'ttl' in packet:
+            packet['ttl'] -= 1
+            if packet['ttl'] <= 0:
+                print(f"[Router {self._router_id}] Pacote descartado - TTL esgotado")
+                return
+            
         destination = packet.get('destination')
         
         if destination == self._router_id:
@@ -202,7 +215,15 @@ class Router:
             self._outgoing_queue.append((packet, ip, port))
             print(f"[Router {self._router_id}] Encaminhando pacote para {destination} via {route['next_hop']}")
         else:
-            print(f"[Router {self._router_id}] Rota não encontrada para {destination}")
+            # Sem rota específica - usa gateway padrão (primeiro vizinho)
+            if self._neighbors:
+                first_neighbor = next(iter(self._neighbors.keys()))
+                ip, port = self._neighbors[first_neighbor]
+                
+                self._outgoing_queue.append((packet, ip, port))
+                print(f"[Router {self._router_id}] Encaminhando pacote para gateway padrão {first_neighbor}")
+            else:
+                print(f"[Router {self._router_id}] Sem vizinhos - pacote descartado")
     
     def _create_lsa_packet(self) -> Dict:
         """Cria um novo pacote LSA"""
@@ -211,6 +232,7 @@ class Router:
             'type': 'lsa',
             'sequence': self._sequence_number,
             'source': self._router_id,
+            'destination': None,
             'payload': {
                 'links': {n: 1 for n in self._neighbors.keys()}
             }
@@ -250,7 +272,7 @@ class Router:
             self._seen_lsas.add((sender_id, sequence))
             self._update_lsdb(sender_id, sequence, links)
         
-        self.print_lsdb()
+        self.get_lsdb_table_formatted()
 
         # Agenda flooding para outros vizinhos
         self._schedule_flooding(lsa, except_neighbor=sender_id)
@@ -344,7 +366,7 @@ class Router:
         with self._lock:
             self._routing_table.update(routing_table)
         
-        self.print_routing_table()
+        self.get_routing_table_formatted()
 
 
 if __name__ == '__main__':
