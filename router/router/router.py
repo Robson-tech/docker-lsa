@@ -1,3 +1,14 @@
+"""
+Simulador de roteador com suporte ao protocolo de estado de enlace (Link-State Routing),
+baseado no algoritmo de Dijkstra, usando comunicação via sockets UDP e multithreading.
+
+Cada roteador:
+
+- Mantém uma base de dados de estado de enlace (LSDB)
+- Calcula rotas com Dijkstra com base nos LSAs recebidos
+- Encaminha pacotes entre hosts e outros roteadores
+"""
+
 import threading
 import socket
 import json
@@ -9,6 +20,14 @@ from collections import defaultdict
 
 class Router:
     def __init__(self, router_id: str, neighbors: Dict[str, Tuple[str, int]], listen_port: int = 5000):
+        """
+        Inicializa o roteador com identificador, vizinhos e porta de escuta.
+
+        Args:
+            router_id: Nome ou ID único do roteador (ex: 'R1').
+            neighbors: Dicionário de vizinhos no formato {id: (ip, porta)}.
+            listen_port: Porta UDP para escutar pacotes recebidos.
+        """
         self._router_id = router_id
         self._neighbors = neighbors
         self._listen_port = listen_port
@@ -25,8 +44,7 @@ class Router:
 
     def _initialize_routing_structures(self) -> None:
         """
-        Inicializa a LSDB e tabela de roteamento com informações básicas.
-        O primeiro vizinho na lista será configurado como gateway padrão.
+        Gera o primeiro LSA e configura rotas para vizinhos diretos e gateway padrão.
         """
         with self._lock:
             # Inicializa a LSDB com o próprio roteador
@@ -49,30 +67,34 @@ class Router:
                 }
             
         print(f"[Router {self._router_id}] Tabela de roteamento inicializada com vizinhos diretos\n{self.get_routing_table_formatted()}")
-    
+
     def _generate_initial_lsa(self) -> None:
-        """Gera o LSA inicial do roteador"""
+        """
+        Cria e registra o LSA inicial do roteador na LSDB.
+        """
         initial_lsa = self._create_lsa_packet()
         self._update_lsdb(self._router_id, self._sequence_number, initial_lsa['payload']['links'])
         self._seen_lsas.add((self._router_id, self._sequence_number))
-    
+
     def _update_lsdb(self, router_id: str, sequence: int, links: Dict[str, int]) -> None:
         """
-        Atualiza o Link State Database com novas informações.
-        
+        Atualiza a LSDB com um novo LSA.
+
         Args:
-            router_id: ID do roteador que originou a informação
-            sequence: Número de sequência do LSA
-            links: Dicionário de enlaces {vizinho: custo}
+            router_id: Identificador do roteador que enviou o LSA.
+            sequence: Número de sequência do LSA.
+            links: Dicionário de vizinhos e custos.
         """
         self._lsdb[router_id] = {
             'sequence': sequence,
             'links': links,
             'timestamp': time.time()
         }
-    
+
     def start(self) -> None:
-        """Inicia as threads de processamento"""
+        """
+        Inicia todas as threads do roteador (recebimento, envio, geração de LSA).
+        """
         self._running = True
         
         # Threads principais
@@ -96,16 +118,18 @@ class Router:
         print(f"[Router {self._router_id}] Threads iniciadas")
 
     def stop(self) -> None:
-        """Para todas as threads do roteador"""
+        """
+        Para todas as threads do roteador de forma segura.
+        """
         self._running = False
         self.receiver_thread.join()
         self.sender_thread.join()
         self.lsa_generator_thread.join()
         print(f"[Router {self._router_id}] Threads paradas")
-    
+
     def get_lsdb_table_formatted(self) -> str:
         """
-        Gera e imprime a Link State Database (LSDB) em formato tabular com contorno.
+        Retorna a LSDB formatada como tabela com bordas.
         """
         with self._lock:
             header = f"┌{'─' * 12}┬{'─' * 22}┬{'─' * 50}┐\n"
@@ -120,11 +144,10 @@ class Router:
             table = header + title + divider + rows + footer
 
         return table
-    
+
     def get_routing_table_formatted(self) -> str:
         """
-        Gera e imprime a tabela de roteamento com bordas usando caracteres de linha.
-        A saída é montada em uma única string para evitar que múltiplas threads quebrem a formatação.
+        Retorna a tabela de roteamento formatada como tabela com bordas.
         """
         with self._lock:
             col1, col2, col3 = 12, 8, 20  # larguras das colunas
@@ -144,9 +167,11 @@ class Router:
             table = top_border + header_line + mid_border + rows + bottom_border
 
         return table
-    
+
     def _receive_packets(self) -> None:
-        """Thread para receber todos os pacotes"""
+        """
+        Thread que escuta pacotes UDP recebidos na porta do roteador.
+        """
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.bind(('0.0.0.0', self._listen_port))
             sock.settimeout(1.0)
@@ -162,9 +187,11 @@ class Router:
                     continue
                 except Exception as e:
                     print(f"[Router {self._router_id}] Erro ao receber: {e}")
-    
+
     def _send_packets(self) -> None:
-        """Thread para enviar pacotes da fila de saída"""
+        """
+        Thread que envia pacotes presentes na fila de saída (_outgoing_queue).
+        """
         while self._running:
             if self._outgoing_queue:
                 with self._lock:
@@ -178,9 +205,11 @@ class Router:
                     print(f"[Router {self._router_id}] Falha no envio: {e}")
             
             time.sleep(0.01)  # Evita uso excessivo da CPU
-    
+
     def _handle_packet(self, packet: Dict) -> None:
-        """Processa pacotes recebidos de acordo com o tipo"""
+        """
+        Trata pacotes recebidos de acordo com o tipo: LSA ou dados.
+        """
         packet_type = packet.get('type')
         
         if packet_type == 'lsa':
@@ -190,11 +219,13 @@ class Router:
             self._process_data_packet(packet)
         else:
             print(f"[Router {self._router_id}] Tipo de pacote inválido: {packet_type}")
-    
-    def _process_data_packet(self, packet: Dict) -> None:
-        """Processa pacotes de dados com roteamento"""
 
-        # Verifica e decrementa TTL
+    def _process_data_packet(self, packet: Dict) -> None:
+        """
+        Processa um pacote de dados e o encaminha com base na tabela de roteamento.
+        TTL é usado para evitar loops.
+        """
+
         if 'ttl' in packet:
             packet['ttl'] -= 1
             if packet['ttl'] <= 0:
@@ -224,9 +255,11 @@ class Router:
                 print(f"[Router {self._router_id}] Encaminhando pacote para gateway padrão {first_neighbor}")
             else:
                 print(f"[Router {self._router_id}] Sem vizinhos - pacote descartado")
-    
+
     def _create_lsa_packet(self) -> Dict:
-        """Cria um novo pacote LSA"""
+        """
+        Cria um novo pacote LSA com sequência incrementada e links atuais.
+        """
         self._sequence_number += 1
         return {
             'type': 'lsa',
@@ -239,7 +272,9 @@ class Router:
         }
 
     def _generate_lsa_packets(self) -> None:
-        """Thread para gerar LSAs periódicos"""
+        """
+        Thread que gera e envia pacotes LSA periodicamente.
+        """
         while self._running:
             lsa = self._create_lsa_packet()
             
@@ -254,7 +289,9 @@ class Router:
             time.sleep(30)  # Intervalo OSPF padrão
 
     def _process_lsa(self, lsa: Dict) -> None:
-        """Processa um LSA recebido e faz flooding controlado"""
+        """
+        Processa LSA recebido e atualiza LSDB com flooding controlado.
+        """
         sender_id = lsa['source']
         sequence = lsa['sequence']
         links = lsa['payload']['links']
@@ -281,7 +318,9 @@ class Router:
         self._run_dijkstra()
 
     def _schedule_flooding(self, lsa: Dict, except_neighbor: Optional[str] = None) -> None:
-        """Adiciona pacotes LSA na fila de saída para flooding"""
+        """
+        Adiciona LSA na fila de envio para todos os vizinhos, exceto o remetente.
+        """
         with self._lock:
             for neighbor_id, (ip, port) in self._neighbors.items():
                 if neighbor_id != except_neighbor:
@@ -289,10 +328,7 @@ class Router:
 
     def _run_dijkstra(self) -> None:
         """
-        Executa o algoritmo de Dijkstra para calcular os caminhos mais curtos.
-        
-        Baseado na LSDB atual, calcula as rotas mais curtas para todos os destinos
-        conhecidos na rede e atualiza a tabela de roteamento.
+        Executa Dijkstra para atualizar rotas com base na LSDB.
         """
         if not self._lsdb:
             return
@@ -333,14 +369,14 @@ class Router:
                     heapq.heappush(priority_queue, (distance, neighbor))
         
         self._update_routing_table(previous_nodes, distances)
-    
+
     def _update_routing_table(self, previous_nodes: Dict[str, str], distances: Dict[str, float]) -> None:
         """
-        Atualiza a tabela de roteamento com base nos resultados do Dijkstra.
-        
+        Atualiza a tabela de roteamento com os caminhos mais curtos.
+
         Args:
-            previous_nodes: Dicionário com os nós anteriores no caminho mais curto
-            distances: Dicionário com as distâncias mais curtas para cada nó
+            previous_nodes: Dicionário com predecessores de cada nó no caminho mais curto.
+            distances: Dicionário com as menores distâncias até cada nó.
         """
         routing_table = {}
         
