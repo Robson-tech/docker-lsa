@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   router_a:
-    image: python:3.9
+    build:
+      context: ./router
+      dockerfile: router/Dockerfile
     container_name: router_a
     networks:
       net_ab:
@@ -13,7 +15,9 @@ services:
     command: tail -f /dev/null
 
   router_b:
-    image: python:3.9
+    build:
+      context: ./router
+      dockerfile: router/Dockerfile
     container_name: router_b
     networks:
       net_ab:
@@ -24,7 +28,9 @@ services:
     command: tail -f /dev/null
 
   router_c:
-    image: python:3.9
+    build:
+      context: ./router
+      dockerfile: router/Dockerfile
     container_name: router_c
     networks:
       net_ac:
@@ -35,7 +41,9 @@ services:
     command: tail -f /dev/null
 
   router_d:
-    image: python:3.9
+    build:
+      context: ./router
+      dockerfile: router/Dockerfile
     container_name: router_d
     networks:
       net_bd:
@@ -46,7 +54,9 @@ services:
     command: tail -f /dev/null
 
   router_e:
-    image: python:3.9
+    build:
+      context: ./router
+      dockerfile: router/Dockerfile
     container_name: router_e
     networks:
       net_ce:
@@ -57,94 +67,134 @@ services:
     command: tail -f /dev/null
 
   host_a1:
-    image: python:3.9
+    build:
+      context: ./host
+      dockerfile: host/Dockerfile
     container_name: host_a1
     networks:
       net_a:
         ipv4_address: 10.0.1.2
     cap_add: ["NET_ADMIN"]
     command: tail -f /dev/null
+    depends_on:
+      - router_a
 
   host_a2:
-    image: python:3.9
+    build:
+      context: ./host
+      dockerfile: host/Dockerfile
     container_name: host_a2
     networks:
       net_a:
         ipv4_address: 10.0.1.3
     cap_add: ["NET_ADMIN"]
     command: tail -f /dev/null
+    depends_on:
+      - router_a
 
   host_b1:
-    image: python:3.9
+    build:
+      context: ./host
+      dockerfile: host/Dockerfile
     container_name: host_b1
     networks:
       net_b:
         ipv4_address: 10.0.2.2
     cap_add: ["NET_ADMIN"]
     command: tail -f /dev/null
+    depends_on:
+      - router_b
 
   host_b2:
-    image: python:3.9
+    build:
+      context: ./host
+      dockerfile: host/Dockerfile
     container_name: host_b2
     networks:
       net_b:
         ipv4_address: 10.0.2.3
     cap_add: ["NET_ADMIN"]
     command: tail -f /dev/null
+    depends_on:
+      - router_b
 
   host_c1:
-    image: python:3.9
+    build:
+      context: ./host
+      dockerfile: host/Dockerfile
     container_name: host_c1
     networks:
       net_c:
         ipv4_address: 10.0.3.2
     cap_add: ["NET_ADMIN"]
     command: tail -f /dev/null
+    depends_on:
+      - router_c
 
   host_c2:
-    image: python:3.9
+    build:
+      context: ./host
+      dockerfile: host/Dockerfile
     container_name: host_c2
     networks:
       net_c:
         ipv4_address: 10.0.3.3
     cap_add: ["NET_ADMIN"]
     command: tail -f /dev/null
+    depends_on:
+      - router_c
 
   host_d1:
-    image: python:3.9
+    build:
+      context: ./host
+      dockerfile: host/Dockerfile
     container_name: host_d1
     networks:
       net_d:
         ipv4_address: 10.0.4.2
     cap_add: ["NET_ADMIN"]
     command: tail -f /dev/null
+    depends_on:
+      - router_d
 
   host_d2:
-    image: python:3.9
+    build:
+      context: ./host
+      dockerfile: host/Dockerfile
     container_name: host_d2
     networks:
       net_d:
         ipv4_address: 10.0.4.3
     cap_add: ["NET_ADMIN"]
     command: tail -f /dev/null
+    depends_on:
+      - router_d
 
   host_e1:
-    image: python:3.9
+    build:
+      context: ./host
+      dockerfile: host/Dockerfile
     container_name: host_e1
     networks:
       net_e:
         ipv4_address: 10.0.5.2
     cap_add: ["NET_ADMIN"]
     command: tail -f /dev/null
+    depends_on:
+      - router_e
 
   host_e2:
-    image: python:3.9
+    build:
+      context: ./host
+      dockerfile: host/Dockerfile
     container_name: host_e2
     networks:
       net_e:
         ipv4_address: 10.0.5.3
     cap_add: ["NET_ADMIN"]
     command: tail -f /dev/null
+    depends_on:
+      - router_e
 
 networks:
   net_a:
