@@ -1,6 +1,6 @@
 import unittest
 
-from router import dijkstra
+from dijkstra import dijkstra
 
 
 class TestDijkstra(unittest.TestCase):

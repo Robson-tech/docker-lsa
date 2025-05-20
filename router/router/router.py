@@ -14,12 +14,13 @@ import socket
 import json
 import time
 import heapq
+import argparse
 from typing import Dict, Tuple, Optional, Any, Set, List
 from collections import defaultdict
 
 
 class Router:
-    def __init__(self, router_id: str, neighbors: Dict[str, Tuple[str, int]], listen_port: int = 5000):
+    def __init__(self, router_id: str, neighbors: Dict[str, Tuple[str, int]], router_ip: str = '0.0.0.0', listen_port: int = 5001):
         """
         Inicializa o roteador com identificador, vizinhos e porta de escuta.
 
@@ -29,6 +30,7 @@ class Router:
             listen_port: Porta UDP para escutar pacotes recebidos.
         """
         self._router_id = router_id
+        self._router_ip = router_ip
         self._neighbors = neighbors
         self._listen_port = listen_port
         self._lsdb: Dict[str, Dict[str, Any]] = {}  # Link State Database
@@ -38,6 +40,9 @@ class Router:
         self._sequence_number = 0
         self._seen_lsas: Set[Tuple[str, int]] = set()
         self._outgoing_queue: List[Tuple[Dict, str, int]] = []  # (packet, ip, port)
+        self._pending_acks = {}  # {sequence: (packet, dest_ip, dest_port, timestamp, retries)}
+        self._ack_lock = threading.Lock()
+        self._last_ack_time = time.time()
 
         # Inicializa estruturas de roteamento
         self._initialize_routing_structures()
@@ -173,7 +178,7 @@ class Router:
         Thread que escuta pacotes UDP recebidos na porta do roteador.
         """
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.bind(('0.0.0.0', self._listen_port))
+            sock.bind((self._router_ip, self._listen_port))
             sock.settimeout(1.0)
 
             print(f"[Router {self._router_id}] Ouvindo pacotes na porta {self._listen_port}")
@@ -191,8 +196,30 @@ class Router:
     def _send_packets(self) -> None:
         """
         Thread que envia pacotes presentes na fila de saída (_outgoing_queue).
+        Agora inclui lógica de retransmissão e confirmação.
         """
         while self._running:
+            current_time = time.time()
+            
+            # 1. Verifica retransmissões pendentes
+            with self._ack_lock:
+                for seq in list(self._pending_acks.keys()):
+                    pkt, ip, port, ts, retries = self._pending_acks[seq]
+                    
+                    if current_time - ts > 2.0:  # Timeout de 2 segundos
+                        if retries < 3:  # Máximo de 3 tentativas
+                            try:
+                                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                                    sock.sendto(json.dumps(pkt).encode(), (ip, port))
+                                    self._pending_acks[seq] = (pkt, ip, port, current_time, retries + 1)
+                                    print(f"[Router {self._router_id}] Retransmitindo pacote (tentativa {retries + 1})")
+                            except Exception as e:
+                                print(f"[Router {self._router_id}] Falha na retransmissão: {e}")
+                        else:
+                            print(f"[Router {self._router_id}] Máximo de retentativas alcançado para seq {seq}")
+                            del self._pending_acks[seq]
+            
+            # 2. Processa novos pacotes da fila
             if self._outgoing_queue:
                 with self._lock:
                     packet, dest_ip, dest_port = self._outgoing_queue.pop(0)
@@ -200,15 +227,23 @@ class Router:
                 try:
                     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                         sock.sendto(json.dumps(packet).encode(), (dest_ip, dest_port))
+                        
+                        # Se for pacote de dados, armazena para possível retransmissão
+                        if packet.get('type') == 'data':
+                            with self._ack_lock:
+                                self._pending_acks[packet['sequence']] = (
+                                    packet, dest_ip, dest_port, current_time, 0
+                                )
+                        
                         print(f"[Router {self._router_id}] Pacote enviado para {dest_ip}:{dest_port}")
                 except Exception as e:
                     print(f"[Router {self._router_id}] Falha no envio: {e}")
             
-            time.sleep(0.01)  # Evita uso excessivo da CPU
+            time.sleep(0.1)  # Intervalo reduzido para melhor responsividade
 
     def _handle_packet(self, packet: Dict) -> None:
         """
-        Trata pacotes recebidos de acordo com o tipo: LSA ou dados.
+        Trata pacotes recebidos de acordo com o tipo: LSA, dados ou ACK.
         """
         packet_type = packet.get('type')
         
@@ -217,21 +252,52 @@ class Router:
         elif packet_type == 'data':
             print(f"[Router {self._router_id}] Pacote de dados recebido de {packet['source']}")
             self._process_data_packet(packet)
+        elif packet_type == 'ack':
+            self._process_ack_packet(packet)
         else:
             print(f"[Router {self._router_id}] Tipo de pacote inválido: {packet_type}")
+
+    def _process_ack_packet(self, packet: Dict) -> None:
+        """
+        Processa um pacote de confirmação (ACK).
+        Remove o pacote confirmado da lista de pendentes.
+        """
+        seq = packet['sequence']
+        with self._ack_lock:
+            if seq in self._pending_acks:
+                del self._pending_acks[seq]
+                print(f"[Router {self._router_id}] Confirmação recebida para pacote {seq}")
+                self._last_ack_time = time.time()
+            else:
+                print(f"[Router {self._router_id}] ACK inesperado para sequência {seq}")
 
     def _process_data_packet(self, packet: Dict) -> None:
         """
         Processa um pacote de dados e o encaminha com base na tabela de roteamento.
-        TTL é usado para evitar loops.
+        Inclui envio de confirmação (ACK) para o remetente.
         """
-
+        # Verifica TTL
         if 'ttl' in packet:
             packet['ttl'] -= 1
             if packet['ttl'] <= 0:
                 print(f"[Router {self._router_id}] Pacote descartado - TTL esgotado")
                 return
-            
+        
+        # Envia ACK de confirmação
+        ack_packet = {
+            'type': 'ack',
+            'sequence': packet['sequence'],
+            'source': self._router_id,
+            'destination': packet['source']
+        }
+        source_ip, source_port = self._neighbors.get(packet['source'], (None, None))
+        
+        if source_ip and source_port:
+            self._outgoing_queue.append((ack_packet, source_ip, source_port))
+        else:
+            print(f"[Router {self._router_id}] Não foi possível enviar ACK - origem desconhecida")
+        
+        # Processamento normal do pacote
         destination = packet.get('destination')
         
         if destination == self._router_id:
@@ -246,11 +312,9 @@ class Router:
             self._outgoing_queue.append((packet, ip, port))
             print(f"[Router {self._router_id}] Encaminhando pacote para {destination} via {route['next_hop']}")
         else:
-            # Sem rota específica - usa gateway padrão (primeiro vizinho)
             if self._neighbors:
                 first_neighbor = next(iter(self._neighbors.keys()))
                 ip, port = self._neighbors[first_neighbor]
-                
                 self._outgoing_queue.append((packet, ip, port))
                 print(f"[Router {self._router_id}] Encaminhando pacote para gateway padrão {first_neighbor}")
             else:
@@ -405,5 +469,42 @@ class Router:
         self.get_routing_table_formatted()
 
 
+def parse_neighbors(neighbors_list: List[str]) -> Dict[str, Tuple[str, int]]:
+    """Converte a lista de vizinhos no formato string para dicionário"""
+    neighbors = {}
+    if neighbors_list:
+        for neighbor_str in neighbors_list:
+            parts = neighbor_str.split(':')
+            if len(parts) == 3:
+                neighbor_id, ip, port = parts
+                neighbors[neighbor_id] = (ip, int(port))
+            else:
+                print(f"Formato inválido para vizinho: {neighbor_str}. Use 'id:ip:porta'")
+    return neighbors
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Inicia um roteador na rede')
+    parser.add_argument('--id', required=True, help='ID único do roteador')
+    parser.add_argument('--neighbors', nargs='+', help='Vizinhos no formato id:ip:porta')
+    parser.add_argument('--ip', default='0.0.0.0', help='Endereço IP deste roteador')
+    parser.add_argument('--listen_port', type=int, default=5000)
+    return parser.parse_args()
+
 if __name__ == '__main__':
-    pass
+    args = parse_arguments()
+    neighbors = parse_neighbors(args.neighbors)
+
+    router = Router(
+        router_id=args.id,
+        neighbors=neighbors,
+        router_ip=args.ip,
+        listen_port=args.listen_port
+    )
+
+    try:
+        router.start()
+        while True:
+            pass
+    except KeyboardInterrupt:
+        router.stop()
