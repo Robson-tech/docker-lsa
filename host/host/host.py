@@ -14,7 +14,7 @@ from typing import List, Dict, Any
 
 
 class Host:
-    def __init__(self, host_id: str, router_ip: str, router_port: int, known_hosts: List[str], host_ip: str = '0.0.0.0', listen_port: int = 7001):
+    def __init__(self, host_id: str, router_ip: str, router_port: int, known_hosts: List[str] = [], host_ip: str = '0.0.0.0', listen_port: int = 7001):
         """
         Classe que representa um host na rede.
 
@@ -126,6 +126,9 @@ class Host:
         mensagens da fila de saída (_outgoing_queue) para o roteador.
         Agora espera confirmação antes de enviar a próxima mensagem.
         """
+        message_count = 0
+        max_messages = 100
+
         while self._running:
             # Mensagem espontânea
             if self._known_hosts and not self._awaiting_confirmation:
@@ -133,6 +136,7 @@ class Host:
                 packet = self._create_data_packet(destination, 'Legal?')
                 with self._lock:
                     self._outgoing_queue.append(packet)
+                message_count += 1
 
             # Envio de mensagens na fila
             with self._lock:
@@ -151,6 +155,11 @@ class Host:
                 with self._lock:
                     self._outgoing_queue.insert(0, packet)  # Recoloca no início da fila
                 self._awaiting_confirmation = False
+
+            # Após enviar 4 mensagens, encerra o host
+            if message_count >= max_messages:
+                print(f"[Host {self._host_id}] Enviou {max_messages} mensagens. Threads de envio encerradas")
+                self._running = False
 
     def _send_packet_to_router(self, packet: Dict[str, Any]):
         """
