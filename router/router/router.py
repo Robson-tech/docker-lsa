@@ -373,7 +373,7 @@ class Router:
             self._seen_lsas.add((sender_id, sequence))
             self._update_lsdb(sender_id, sequence, links)
         
-        self.get_lsdb_table_formatted()
+        print(self.get_lsdb_table_formatted())
 
         # Agenda flooding para outros vizinhos
         self._schedule_flooding(lsa, except_neighbor=sender_id)
@@ -466,7 +466,7 @@ class Router:
         with self._lock:
             self._routing_table.update(routing_table)
         
-        self.get_routing_table_formatted()
+        print(self.get_routing_table_formatted())
 
 
 def parse_neighbors(neighbors_list: List[str]) -> Dict[str, Tuple[str, int]]:
