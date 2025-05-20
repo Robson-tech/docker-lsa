@@ -20,7 +20,7 @@ from collections import defaultdict
 
 
 class Router:
-    def __init__(self, router_id: str, neighbors: Dict[str, Tuple[str, int]], router_ip: str = '0.0.0.0', listen_port: int = 5001):
+    def __init__(self, router_id: str, neighbors: Dict[str, Tuple[str, int]] = [], router_ip: str = '0.0.0.0', listen_port: int = 5001):
         """
         Inicializa o roteador com identificador, vizinhos e porta de escuta.
 
