@@ -12,12 +12,14 @@ services:
       net_ac:
         ipv4_address: 10.0.13.2
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python router.py
       --id A
       --ip 10.0.1.100
       --listen_port 5001
-      --neighbors "H1:10.0.1.2:7001" "H2:10.0.1.3:7002" "B:10.0.12.3:5002" "C:10.0.13.3:5003"
+      --neighbors "B:10.0.12.3:5002" "C:10.0.13.3:5003" "H1:10.0.1.2:7001" "H2:10.0.1.3:7002"
 
   router_b:
     build:
@@ -32,12 +34,14 @@ services:
       net_bd:
         ipv4_address: 10.0.24.2
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python router.py
       --id B
       --ip 10.0.2.100
       --listen_port 5002
-      --neighbors "H3:10.0.2.2:7003" "H4:10.0.2.3:7004" "A:10.0.12.2:5001" "D:10.0.24.3:5004" "E:10.0.25.2:5005"
+      --neighbors "D:10.0.24.3:5004" "A:10.0.12.2:5001" "H3:10.0.2.2:7003" "H4:10.0.2.3:7004"
 
   router_c:
     build:
@@ -52,12 +56,14 @@ services:
       net_ce:
         ipv4_address: 10.0.35.2
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python router.py
       --id C
       --ip 10.0.3.100
       --listen_port 5003
-      --neighbors "H5:10.0.3.2:7005" "H6:10.0.3.3:7006" "A:10.0.13.2:5001" "E:10.0.35.3:5005"
+      --neighbors "E:10.0.35.3:5005" "A:10.0.13.2:5001" "H5:10.0.3.2:7005" "H6:10.0.3.3:7006"
 
   router_d:
     build:
@@ -72,12 +78,14 @@ services:
       net_de:
         ipv4_address: 10.0.45.2
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python router.py
       --id D
       --ip 10.0.4.100
       --listen_port 5004
-      --neighbors "H7:10.0.4.2:7007" "H8:10.0.4.3:7008" "B:10.0.24.2:5002" "E:10.0.45.3:5005"
+      --neighbors "B:10.0.24.2:5002" "E:10.0.45.3:5005" "H7:10.0.4.2:7007" "H8:10.0.4.3:7008"
 
   router_e:
     build:
@@ -92,12 +100,14 @@ services:
       net_de:
         ipv4_address: 10.0.45.3
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python router.py
       --id E
       --ip 10.0.5.100
       --listen_port 5005
-      --neighbors "H9:10.0.5.2:7009" "H10:10.0.5.2:7010" "B:10.0.25.2:5002" "C:10.0.35.2:5003" "D:10.0.45.2:5004"
+      --neighbors "D:10.0.45.2:5004" "C:10.0.35.2:5003" "H9:10.0.5.2:7009" "H10:10.0.5.2:7010"
 
   host_a1:
     build:
@@ -108,6 +118,8 @@ services:
       net_a:
         ipv4_address: 10.0.1.2
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python host.py
       --id H1
@@ -128,6 +140,8 @@ services:
       net_a:
         ipv4_address: 10.0.1.3
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python host.py
       --id H2
@@ -148,6 +162,8 @@ services:
       net_b:
         ipv4_address: 10.0.2.2
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python host.py
       --id H3
@@ -168,6 +184,8 @@ services:
       net_b:
         ipv4_address: 10.0.2.3
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python host.py
       --id H4
@@ -188,6 +206,8 @@ services:
       net_c:
         ipv4_address: 10.0.3.2
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python host.py
       --id H5
@@ -208,6 +228,8 @@ services:
       net_c:
         ipv4_address: 10.0.3.3
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python host.py
       --id H6
@@ -228,6 +250,8 @@ services:
       net_d:
         ipv4_address: 10.0.4.2
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python host.py
       --id H7
@@ -248,6 +272,8 @@ services:
       net_d:
         ipv4_address: 10.0.4.3
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python host.py
       --id H8
@@ -268,6 +294,8 @@ services:
       net_e:
         ipv4_address: 10.0.5.2
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python host.py
       --id H9
@@ -288,6 +316,8 @@ services:
       net_e:
         ipv4_address: 10.0.5.3
     cap_add: ["NET_ADMIN"]
+    tty: true
+    stdin_open: true
     command: >
       python host.py
       --id H10
