@@ -7,12 +7,19 @@ services:
       dockerfile: router/Dockerfile
     container_name: router_a
     networks:
+      net_a:
+        ipv4_address: 10.0.1.1
       net_ab:
         ipv4_address: 10.0.12.2
       net_ac:
         ipv4_address: 10.0.13.2
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python router.py
+      --id A
+      --ip 10.0.1.1
+      --listen_port 5001
+      --neighbors "B:10.0.12.3:5002" "C:10.0.13.3:5003"
 
   router_b:
     build:
@@ -20,12 +27,19 @@ services:
       dockerfile: router/Dockerfile
     container_name: router_b
     networks:
+      net_b:
+        ipv4_address: 10.0.2.1
       net_ab:
         ipv4_address: 10.0.12.3
       net_bd:
         ipv4_address: 10.0.24.2
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python router.py
+      --id B
+      --ip 10.0.2.1
+      --listen_port 5002
+      --neighbors "A:10.0.12.2:5001" "D:10.0.24.3:5004" "E:10.0.25.2:5005"
 
   router_c:
     build:
@@ -33,12 +47,19 @@ services:
       dockerfile: router/Dockerfile
     container_name: router_c
     networks:
+      net_c:
+        ipv4_address: 10.0.3.1
       net_ac:
         ipv4_address: 10.0.13.3
       net_ce:
         ipv4_address: 10.0.35.2
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python router.py
+      --id C
+      --ip 10.0.3.1
+      --listen_port 5003
+      --neighbors "A:10.0.13.2:5001" "E:10.0.35.3:5005"
 
   router_d:
     build:
@@ -46,12 +67,19 @@ services:
       dockerfile: router/Dockerfile
     container_name: router_d
     networks:
+      net_d:
+        ipv4_address: 10.0.4.1
       net_bd:
         ipv4_address: 10.0.24.3
       net_de:
         ipv4_address: 10.0.45.2
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python router.py
+      --id D
+      --ip 10.0.4.1
+      --listen_port 5004
+      --neighbors "B:10.0.24.2:5002" "E:10.0.45.3:5005"
 
   router_e:
     build:
@@ -59,12 +87,19 @@ services:
       dockerfile: router/Dockerfile
     container_name: router_e
     networks:
+      net_e:
+        ipv4_address: 10.0.5.1
       net_ce:
         ipv4_address: 10.0.35.3
       net_de:
         ipv4_address: 10.0.45.3
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python router.py
+      --id E
+      --ip 10.0.5.1
+      --listen_port 5005
+      --neighbors "B:10.0.25.2:5002" "C:10.0.35.2:5003" "D:10.0.45.2:5004"
 
   host_a1:
     build:
@@ -75,7 +110,14 @@ services:
       net_a:
         ipv4_address: 10.0.1.2
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python host.py
+      --id H1
+      --ip 10.0.1.2
+      --router_ip 10.0.1.1
+      --router_port 5001
+      --listen_port 7001
+      --known_hosts H2 H3 H4 H5 H6 H7 H8 H9 H10
     depends_on:
       - router_a
 
@@ -88,7 +130,14 @@ services:
       net_a:
         ipv4_address: 10.0.1.3
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python host.py
+      --id H2
+      --ip 10.0.1.3
+      --router_ip 10.0.1.1
+      --router_port 5001
+      --listen_port 7002
+      --known_hosts H1 H3 H4 H5 H6 H7 H8 H9 H10
     depends_on:
       - router_a
 
@@ -101,7 +150,14 @@ services:
       net_b:
         ipv4_address: 10.0.2.2
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python host.py
+      --id H3
+      --ip 10.0.2.2
+      --router_ip 10.0.2.1
+      --router_port 5002
+      --listen_port 7003
+      --known_hosts H1 H2 H4 H5 H6 H7 H8 H9 H10
     depends_on:
       - router_b
 
@@ -114,7 +170,14 @@ services:
       net_b:
         ipv4_address: 10.0.2.3
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python host.py
+      --id H4
+      --ip 10.0.2.3
+      --router_ip 10.0.2.1
+      --router_port 5002
+      --listen_port 7004
+      --known_hosts H1 H2 H3 H5 H6 H7 H8 H9 H10
     depends_on:
       - router_b
 
@@ -127,7 +190,14 @@ services:
       net_c:
         ipv4_address: 10.0.3.2
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python host.py
+      --id H5
+      --ip 10.0.3.2
+      --router_ip 10.0.3.1
+      --router_port 5003
+      --listen_port 7005
+      --known_hosts H1 H2 H3 H4 H6 H7 H8 H9 H10
     depends_on:
       - router_c
 
@@ -140,7 +210,14 @@ services:
       net_c:
         ipv4_address: 10.0.3.3
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python host.py
+      --id H6
+      --ip 10.0.3.3
+      --router_ip 10.0.3.1
+      --router_port 5003
+      --listen_port 7006
+      --known_hosts H1 H2 H3 H4 H5 H7 H8 H9 H10
     depends_on:
       - router_c
 
@@ -153,7 +230,14 @@ services:
       net_d:
         ipv4_address: 10.0.4.2
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python host.py
+      --id H7
+      --ip 10.0.4.2
+      --router_ip 10.0.4.1
+      --router_port 5004
+      --listen_port 7007
+      --known_hosts H1 H2 H3 H4 H5 H6 H8 H9 H10
     depends_on:
       - router_d
 
@@ -166,7 +250,14 @@ services:
       net_d:
         ipv4_address: 10.0.4.3
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python host.py
+      --id H8
+      --ip 10.0.4.3
+      --router_ip 10.0.4.1
+      --router_port 5004
+      --listen_port 7008
+      --known_hosts H1 H2 H3 H4 H5 H6 H7 H9 H10
     depends_on:
       - router_d
 
@@ -179,7 +270,14 @@ services:
       net_e:
         ipv4_address: 10.0.5.2
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python host.py
+      --id H9
+      --ip 10.0.5.2
+      --router_ip 10.0.5.1
+      --router_port 5005
+      --listen_port 7009
+      --known_hosts H1 H2 H3 H4 H5 H6 H7 H8 H10
     depends_on:
       - router_e
 
@@ -192,7 +290,14 @@ services:
       net_e:
         ipv4_address: 10.0.5.3
     cap_add: ["NET_ADMIN"]
-    command: tail -f /dev/null
+    command: >
+      python host.py
+      --id H10
+      --ip 10.0.5.3
+      --router_ip 10.0.5.1
+      --router_port 5005
+      --listen_port 7010
+      --known_hosts H1 H2 H3 H4 H5 H6 H7 H8 H9
     depends_on:
       - router_e
 
